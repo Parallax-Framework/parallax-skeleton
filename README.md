@@ -18,7 +18,7 @@ This schema exists to:
 ```lua
 SCHEMA.Name = "Skeleton"
 SCHEMA.Description = "A prototype schema for the Parallax framework."
-SCHEMA.Author = "Parallax Developers"
+SCHEMA.Author = "Riggs"
 
 ow.util:LoadFolder("meta")
 ow.util:LoadFolder("hooks")
