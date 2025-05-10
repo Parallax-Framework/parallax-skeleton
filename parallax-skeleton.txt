@@ -1,0 +1,7 @@
+"parallax-skeleton"
+{
+    "base"              "parallax"
+    "title"             "Parallax: Skeleton"
+    "author"            "Riggs"
+    "menusystem"        "1"
+}
