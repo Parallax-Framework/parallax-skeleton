@@ -14,7 +14,7 @@ This schema exists to:
 
 ---
 
-## ⚙️ Schema System (`sh_schema.lua`)
+## ⚙️ Schema System (`boot.lua`)
 
 The schema system handles all startup logic:
 
