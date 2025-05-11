@@ -165,7 +165,6 @@ Make sure the folder name matches the gamemode name.
 
 - Use `ax.util:LoadFolder(path)` for bulk folder includes
 - Use `ax.util:Print()` for debug logging
-- Use `MODULE = nil` after every module definition to avoid leaking data
 - All modules are registered in `ax.module.stored`
 
 ---
