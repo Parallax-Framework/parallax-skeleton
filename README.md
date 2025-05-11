@@ -14,7 +14,7 @@ This schema exists to:
 
 ---
 
-## ⚙️ Schema System (`boot.lua`)
+## ⚙️ Schema System
 
 The schema system handles all startup logic:
 
@@ -50,7 +50,7 @@ gamemodes/
 
 ---
 
-## 🧩 Module System (`sh_module.lua`)
+## 🧩 Module System
 
 The module system loads optional logic from `/modules`.
 
