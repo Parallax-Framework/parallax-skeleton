@@ -52,22 +52,47 @@ gamemodes/
 
 ## 🧩 Module System
 
-The module system loads optional logic from `/modules`.
+The module system loads optional content from the `/modules` directory and supports both folder-based and single-file module formats.
 
-### Supports:
-- Folder modules with a `sh_module.lua` file
-- Single-file modules with `sh_`, `sv_`, or `cl_` prefixes
-- Derma panels and entities inside each module
-- Hooks: `PreInitializeModules`, `PreInitializeModule`, `PostInitializeModule`, `PostInitializeModules`
+### ✅ Supports:
 
-**Folder-based module:**
+* Folder-based modules with a `sh_module.lua` file
+* Single-file modules (`sh_`, `sv_`, or `cl_` prefix)
+* Automatic loading of:
+
+  * `ui/`
+  * `libraries/` (`external`, `client`, `shared`, `server`)
+  * `factions/`
+  * `classes/`
+  * `system/`
+  * `meta/`
+  * `hooks/`
+  * `net/`
+  * `languages/`
+  * `config/`
+  * `items/`
+  * `entities/`
+* Hook lifecycle:
+
+  * `PreInitializeModules`
+  * `PreInitializeModule`
+  * `PostInitializeModule`
+  * `PostInitializeModules`
+
+---
+
+**Folder-based module example:**
 
 ```
 modules/
 └── security/
     ├── sh_module.lua
     ├── ui/
-    └── entities/
+    ├── classes/
+    ├── factions/
+    ├── libraries/
+    ├── entities/
+    └── items/
 ```
 
 ```lua
@@ -80,7 +105,9 @@ function MODULE:Initialized()
 end
 ```
 
-**Single-file module:**
+---
+
+**Single-file module example:**
 
 ```
 modules/sh_chat.lua
