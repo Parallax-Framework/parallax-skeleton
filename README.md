@@ -52,77 +52,79 @@ gamemodes/
 
 ## 🧩 Module System
 
-The module system loads optional content from the `/modules` directory and supports both folder-based and single-file module formats.
+Parallax supports a modular structure that lets you break your schema into reusable features. Whether it's a chat system, logging framework, or UI extension — modules make your code cleaner and easier to manage.
 
-### ✅ Supports:
+### ✅ What Modules Support
 
-* Folder-based modules with a `sh_module.lua` file
-* Single-file modules (`sh_`, `sv_`, or `cl_` prefix)
-* Automatic loading of:
+Modules are loaded from the `/modules` folder and support two formats:
 
-  * `ui/`
-  * `libraries/` (`external`, `client`, `shared`, `server`)
-  * `factions/`
-  * `classes/`
-  * `system/`
-  * `meta/`
-  * `hooks/`
-  * `net/`
-  * `languages/`
-  * `config/`
-  * `items/`
-  * `entities/`
-* Hook lifecycle:
+* **Folder-based modules** using a `boot.lua` file as the entry point
+* **Single-file modules** with names like `sh_example.lua`, `sv_logger.lua`, or `cl_ui.lua`
 
-  * `PreInitializeModules`
-  * `PreInitializeModule`
-  * `PostInitializeModule`
-  * `PostInitializeModules`
+When loading, the system automatically includes:
+
+* Common logic folders like:
+
+  * `libraries/shared`, `libraries/client`, `libraries/server`, `libraries/external`
+* Core content folders:
+
+  * `factions/`, `classes/`, `system/`, `meta/`, `hooks/`, `net/`, `languages/`, `config/`, `ui/`, `items/`, `entities/`
+* Pre/Post initialization hooks:
+
+  * `PreInitializeModules`, `PreInitializeModule`, `PostInitializeModule`, `PostInitializeModules`
 
 ---
 
-**Folder-based module example:**
+### 📁 Folder-based Module Example
+
+If your feature needs multiple files or folders, use a structured format like this:
 
 ```
 modules/
-└── security/
-    ├── sh_module.lua
+└── logging/
+    ├── boot.lua
+    ├── system/
+    ├── hooks/
     ├── ui/
-    ├── classes/
-    ├── factions/
-    ├── libraries/
-    ├── entities/
-    └── items/
+    └── libraries/external/
 ```
 
+**Example `boot.lua`:**
+
 ```lua
-MODULE.Name = "Security Systems"
-MODULE.Description = "Adds security terminals and cameras."
+MODULE.Name = "Logging"
+MODULE.Description = "Logs player actions and events."
 MODULE.Author = "Riggs"
 
 function MODULE:Initialized()
-    print("Security module loaded.")
+    ax.util:Print("Logging system is now active.")
 end
 ```
+
+Once placed inside `modules/`, this module is picked up automatically.
 
 ---
 
-**Single-file module example:**
+### 📄 Single-file Module Example
+
+For small features, just drop a file in the `modules/` directory:
 
 ```
-modules/sh_chat.lua
+modules/sh_announcer.lua
 ```
 
 ```lua
-MODULE.Name = "Chat System"
-MODULE.Description = "Basic announcement system."
+MODULE.Name = "Announcer"
+MODULE.Description = "Lets admins broadcast messages."
 
 function MODULE:Broadcast(msg)
-    for _, v in ipairs(player.GetAll()) do
-        v:ChatPrint("[ANNOUNCEMENT] " .. msg)
+    for _, ply in ipairs(player.GetAll()) do
+        ply:ChatPrint("[ANNOUNCEMENT] " .. msg)
     end
 end
 ```
+
+No folders required. Just prefix with `sh_`, `sv_`, or `cl_` depending on the file's purpose.
 
 ---
 
