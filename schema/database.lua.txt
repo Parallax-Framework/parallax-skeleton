@@ -1,0 +1,7 @@
+ax.database:Initialize({
+    host = "localhost",
+    username = "root",
+    password = "",
+    database = "gmod",
+    port = 3306
+})
