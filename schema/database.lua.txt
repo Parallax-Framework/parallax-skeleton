@@ -1,4 +1,4 @@
-ax.database:Initialize({
+Parallax.Database:Initialize({
     host = "localhost",
     username = "root",
     password = "",

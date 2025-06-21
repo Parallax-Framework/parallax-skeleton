@@ -1,4 +1,4 @@
-FACTION_CITIZEN = ax.faction:Register({
+FACTION_CITIZEN = Parallax.Faction:Register({
     Name = "Citizen",
     Description = "An ordinary citizen living life while wearing ridiculous clothing.",
     Color = Color(20, 150, 20),

@@ -1,2 +1,2 @@
--- ax.config:SetDefault("color.schema", Color(0, 200, 75))
--- ax.config:SetDefault("mainmenu.music", "music/vlvx_song15.mp3")
+-- Parallax.Config:SetDefault("color.schema", Color(0, 200, 75))
+-- Parallax.Config:SetDefault("mainmenu.music", "music/vlvx_song15.mp3")
