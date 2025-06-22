@@ -1,6 +1,10 @@
-ITEM.Name = "Unsigned Divorce Papers"
-ITEM.Description = "A set of unsigned divorce papers."
-ITEM.Category = "Food & Drink"
-ITEM.Model = Model("models/props_c17/paper01.mdl")
+local ITEM = ax.item:Instance()
 
-ITEM.Weight = 0.1
+ITEM:SetName("Unsigned Divorce Papers")
+ITEM:SetDescription("A set of unsigned divorce papers.")
+ITEM:SetCategory("Food & Drink")
+ITEM:SetModel(Model("models/props_c17/paper01.mdl"))
+
+ITEM:SetWeight(0.1)
+
+ITEM:Register()

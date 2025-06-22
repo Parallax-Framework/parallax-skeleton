@@ -1,6 +1,10 @@
-ITEM.Name = "Soda Can"
-ITEM.Description = "A can of soda."
-ITEM.Category = "Food & Drink"
-ITEM.Model = Model("models/props_junk/PopCan01a.mdl")
+local ITEM = ax.item:Instance()
 
-ITEM.Weight = 0.5
+ITEM:SetName("Soda Can")
+ITEM:SetDescription("A can of soda.")
+ITEM:SetCategory("Food & Drink")
+ITEM:SetModel(Model("models/props_junk/PopCan01a.mdl"))
+
+ITEM:SetWeight(0.5)
+
+ITEM:Register()
