@@ -1,8 +1,9 @@
-FACTION_CITIZEN = Parallax.Faction:Register({
-    Name = "Citizen",
-    Description = "An ordinary citizen living life while wearing ridiculous clothing.",
-    Color = Color(20, 150, 20),
-    IsDefault = true,
+FACTION_CITIZEN = Parallax.Faction:Instance()
+FACTION_CITIZEN:SetName("Citizen")
+FACTION_CITIZEN:SetDescription("An ordinary citizen living life while wearing ridiculous clothing.")
+FACTION_CITIZEN:SetColor(Color(20, 150, 20))
+FACTION_CITIZEN:MakeDefault()
 
-    Image = "gamepadui/hl2/chapter1"
-})
+FACTION_CITIZEN.Image = Parallax.Util:GetMaterial("gamepadui/hl2/chapter1")
+
+FACTION_CITIZEN = FACTION_CITIZEN:Register()
