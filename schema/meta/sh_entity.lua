@@ -1,1 +1,0 @@
-local ENTITY = FindMetaTable("Entity")
