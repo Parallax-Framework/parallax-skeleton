@@ -1,0 +1,351 @@
+-- lua/autorun/client/cmb_hud.lua
+if SERVER then return end
+
+---------------------------------------
+-- Config (client ConVars)
+---------------------------------------
+CreateClientConVar("cmb_hud_enabled", "1", true, false, "Enable the Combine HUD")
+CreateClientConVar("cmb_hud_cheap", "0", true, false, "Cheap mode: no curvature warp")
+CreateClientConVar("cmb_hud_stability", "72", true, false, "0-100 politistabilization index")
+CreateClientConVar("cmb_hud_code", "CODE: GREEN", true, false, "Status line text")
+CreateClientConVar("cmb_hud_hide_default_ammo", "1", true, false, "Hide default ammo HUD")
+
+-- Optional: override icon materials via convars if you want
+CreateClientConVar("cmb_hud_icon_stability", "icon16/shield.png", true, false)
+CreateClientConVar("cmb_hud_icon_clock",     "icon16/clock.png",  true, false)
+CreateClientConVar("cmb_hud_icon_compass",   "icon16/compass.png",true, false)
+CreateClientConVar("cmb_hud_icon_squad",     "icon16/group.png",  true, false)
+CreateClientConVar("cmb_hud_icon_ammo",      "icon16/bullet_black.png", true, false)
+
+---------------------------------------
+-- Small helpers
+---------------------------------------
+local function ScreenScaleH(n) return ScrH() / 480 * n end
+local function upper(s) return string.upper(tostring(s or "")) end
+
+local function SafeGetBool(cvar, fallback)
+    local cv = GetConVar(cvar)
+    if not cv then return fallback end
+    return cv:GetBool()
+end
+
+local function SafeGetString(cvar, fallback)
+    local cv = GetConVar(cvar)
+    if not cv then return fallback end
+    return cv:GetString()
+end
+
+local function LoadIcon(path)
+    if not path or path == "" then return nil end
+    local mat = Material(path, "smooth")
+    if mat:IsError() then return nil end
+    return mat
+end
+
+local function DrawIcon(mat, x, y, size, col, alignX, alignY)
+    if not mat then return end
+    surface.SetMaterial(mat)
+    surface.SetDrawColor(col or color_white)
+    local w, h = size, size
+    local ox, oy = 0, 0
+    if alignX == TEXT_ALIGN_CENTER then ox = -w/2 elseif alignX == TEXT_ALIGN_RIGHT then ox = -w end
+    if alignY == TEXT_ALIGN_CENTER then oy = -h/2 elseif alignY == TEXT_ALIGN_BOTTOM then oy = -h end
+    surface.DrawTexturedRect(x + ox, y + oy, w, h)
+end
+
+---------------------------------------
+-- Hide default HUD bits (optional)
+---------------------------------------
+local hide = { ["CHudAmmo"]=true, ["CHudSecondaryAmmo"]=true }
+hook.Add("HUDShouldDraw","CMBHUD.HideDefault", function(name)
+    if not SafeGetBool("cmb_hud_hide_default_ammo", true) then return end
+    if hide[name] then return false end
+end)
+
+---------------------------------------
+-- Fonts
+---------------------------------------
+local function CreateCMBFonts()
+    surface.CreateFont("cmb.notice.header", { font="OCR A Extended", size=ScreenScaleH(10), weight=400, extended=true })
+    surface.CreateFont("cmb.notice",        { font="OCR A Extended", size=ScreenScaleH(8),  weight=400, extended=true })
+    surface.CreateFont("cmb.socio.header",  { font="OCR A Extended", size=ScreenScaleH(10), weight=400, extended=true })
+    surface.CreateFont("cmb.socio",         { font="OCR A Extended", size=ScreenScaleH(8),  weight=400, extended=true })
+    surface.CreateFont("cmb.compass.direction", { font="OCR A Extended", size=ScreenScaleH(12), weight=400, extended=true })
+    surface.CreateFont("cmb.compass.degrees",   { font="OCR A Extended", size=ScreenScaleH(6),  weight=400, extended=true })
+    surface.CreateFont("cmb.squad.header",  { font="OCR A Extended", size=ScreenScaleH(10), weight=400, extended=true })
+    surface.CreateFont("cmb.squad",         { font="OCR A Extended", size=ScreenScaleH(8),  weight=400, extended=true })
+    surface.CreateFont("cmb.ammo.clip",     { font="OCR A Extended", size=ScreenScaleH(16), weight=400, extended=true })
+    surface.CreateFont("cmb.ammo.reserve",  { font="OCR A Extended", size=ScreenScaleH(12), weight=400, extended=true })
+end
+CreateCMBFonts()
+hook.Add("OnScreenSizeChanged","CMBHUD.RebuildFonts", CreateCMBFonts)
+
+---------------------------------------
+-- State
+---------------------------------------
+local CMBHUD = {}
+local headingLerp = 0
+local lastScrW, lastScrH = 0, 0
+local rtTex, rtMat = nil, nil
+local overlaySegments, overlayCurveAmount
+
+-- icons (loaded lazily each frame in case you change convars)
+local iconMats = {}
+
+local directionLabels = {
+    [0]="N",[45]="NE",[90]="E",[135]="SE",[180]="S",[225]="SW",[270]="W",[315]="NW"
+}
+local function AngleLerp(frac, a, b)
+    local diff = (b - a + 540) % 360 - 180
+    return (a + diff * frac) % 360
+end
+
+---------------------------------------
+-- RT + Material setup (fixed)
+---------------------------------------
+local function EnsureRT(scrW, scrH)
+    if not rtTex or scrW ~= lastScrW or scrH ~= lastScrH then
+        local name = ("CMBHUD_RT_%dx%d"):format(scrW, scrH)
+        rtTex = GetRenderTargetEx(name, scrW, scrH, RT_SIZE_OFFSCREEN, MATERIAL_RT_DEPTH_SHARED, 0, 0, IMAGE_FORMAT_RGBA8888)
+
+        if (not rtMat) or rtMat:IsError() then
+            rtMat = CreateMaterial("CMBHUD_Mat_"..scrW.."x"..scrH, "UnlitGeneric", {
+                ["$translucent"]="1", ["$vertexalpha"]="1", ["$vertexcolor"]="1",
+                ["$basetexture"]=name, ["$basetexturefiltermode"]="0",
+                ["$ignorez"]="1", ["$nocull"]="1"
+            })
+        end
+        -- bind actual ITexture every rebuild (paranoid but safe)
+        rtMat:SetTexture("$basetexture", rtTex)
+
+        lastScrW, lastScrH = scrW, scrH
+        overlaySegments = math.max(128, math.floor(scrW / 4))
+        overlayCurveAmount = math.max(16, math.floor((ScrH() + ScrW()) * 0.025))
+    end
+end
+
+local function BakeHUDToRT(scrW, scrH)
+    EnsureRT(scrW, scrH)
+    render.PushRenderTarget(rtTex)
+        render.Clear(0, 0, 0, 0, true, true)
+        cam.Start2D()
+            CMBHUD.DrawBase(scrW, scrH, LocalPlayer())
+            hook.Run("CMBHUD_DrawOverlay")
+        cam.End2D()
+    render.PopRenderTarget()
+end
+
+local function DrawWarpedHUD(scrW, scrH)
+    EnsureRT(scrW, scrH)
+
+    cam.IgnoreZ(true)
+    render.CullMode(MATERIAL_CULLMODE_CW)
+    render.SetMaterial(rtMat)
+
+    mesh.Begin(MATERIAL_TRIANGLES, overlaySegments * 2)
+        for i = 0, overlaySegments - 1 do
+            local u1 = i / overlaySegments
+            local u2 = (i + 1) / overlaySegments
+            local x1, x2 = u1 * scrW, u2 * scrW
+            local off1 = math.sin(u1 * math.pi) * overlayCurveAmount
+            local off2 = math.sin(u2 * math.pi) * overlayCurveAmount
+            local yT1, yT2 = 0 + off1, 0 + off2
+            local yB1, yB2 = scrH - off1, scrH - off2
+
+            -- tri 1
+            mesh.Position(Vector(x1, yT1, 0)); mesh.TexCoord(0, u1, 0); mesh.Color(255,255,255,255); mesh.AdvanceVertex()
+            mesh.Position(Vector(x2, yT2, 0)); mesh.TexCoord(0, u2, 0); mesh.Color(255,255,255,255); mesh.AdvanceVertex()
+            mesh.Position(Vector(x2, yB2, 0)); mesh.TexCoord(0, u2, 1); mesh.Color(255,255,255,255); mesh.AdvanceVertex()
+            -- tri 2
+            mesh.Position(Vector(x1, yT1, 0)); mesh.TexCoord(0, u1, 0); mesh.Color(255,255,255,255); mesh.AdvanceVertex()
+            mesh.Position(Vector(x2, yB2, 0)); mesh.TexCoord(0, u2, 1); mesh.Color(255,255,255,255); mesh.AdvanceVertex()
+            mesh.Position(Vector(x1, yB1, 0)); mesh.TexCoord(0, u1, 1); mesh.Color(255,255,255,255); mesh.AdvanceVertex()
+        end
+    mesh.End()
+
+    render.CullMode(MATERIAL_CULLMODE_CCW)
+    cam.IgnoreZ(false)
+end
+
+---------------------------------------
+-- Drawing pieces (with icons)
+---------------------------------------
+function CMBHUD.DrawBase(scrW, scrH, client)
+    -- live-load icons so you can tweak convars without map change
+    iconMats.stability = LoadIcon(SafeGetString("cmb_hud_icon_stability","icon16/shield.png"))
+    iconMats.clock     = LoadIcon(SafeGetString("cmb_hud_icon_clock","icon16/clock.png"))
+    iconMats.compass   = LoadIcon(SafeGetString("cmb_hud_icon_compass","icon16/compass.png"))
+    iconMats.squad     = LoadIcon(SafeGetString("cmb_hud_icon_squad","icon16/group.png"))
+    iconMats.ammo      = LoadIcon(SafeGetString("cmb_hud_icon_ammo","icon16/bullet_black.png"))
+
+    CMBHUD.DrawGeneralInfo(scrW, scrH, client)
+    CMBHUD.DrawCompass(scrW, scrH, client)
+    CMBHUD.DrawSquadInfo(scrW, scrH, client)
+    CMBHUD.DrawAmmoCounter(scrW, scrH, client)
+end
+
+-- General info
+function CMBHUD.DrawGeneralInfo(scrW, scrH, client)
+    local x, y = scrW - ScreenScale(16), ScreenScaleH(16)
+
+    -- header with shield icon
+    local header = ":: POLITISTABILIZATION INDEX ::"
+    local iconSize = ScreenScaleH(10)
+    DrawIcon(iconMats.stability, x - iconSize - 4, y + iconSize*0.5, iconSize, Color(255,200,0), TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
+    draw.SimpleText(header, "cmb.socio.header", x, y, Color(255, 200, 0), TEXT_ALIGN_RIGHT, TEXT_ALIGN_TOP)
+    y = y + draw.GetFontHeight("cmb.socio.header")
+
+    -- values
+    local activeCodeName = upper(GetConVar("cmb_hud_code"):GetString())
+    if (#activeCodeName > 30) then activeCodeName = string.sub(activeCodeName, 1, 30) .. "..." end
+
+    local socio = math.Clamp(GetConVar("cmb_hud_stability"):GetFloat(), 0, 100)
+    local col  = Color(255, 255 - socio * 2.55, 255 - socio * 2.55)
+    local txt  = math.Round(socio) .. "%"
+
+    local boxW, boxH = ScreenScale(48), draw.GetFontHeight("cmb.socio") * 3
+    surface.SetDrawColor(30, 70, 80, 150); surface.DrawRect(x - boxW, y + 2, boxW, boxH - 4)
+    surface.SetDrawColor(200, 200, 200, 200)
+    surface.DrawRect(x - boxW, y, 2, boxH); surface.DrawRect(x - boxW + 2, y, 2, 2)
+    surface.DrawRect(x - boxW + 2, y + boxH - 2, 2, 2); surface.DrawRect(x - 2, y, 2, boxH)
+    surface.DrawRect(x - 4, y, 2, 2); surface.DrawRect(x - 4, y + boxH - 2, 2, 2)
+
+    draw.SimpleText(txt, "cmb.socio.header", x - boxW / 2, y + 8, col, TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
+    draw.SimpleText("Marginal", "cmb.socio", x - boxW / 2, y + boxH - 8, col, TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM)
+
+    -- Area + time with clock icon
+    surface.SetFont("cmb.socio.header")
+    local headerW = select(1, surface.GetTextSize(header))
+    local areaName = upper(game.GetMap() or "UNKNOWN AREA")
+    local time = "(" .. os.date("%H:%M") .. ")"
+
+    local lineY = y + boxH + 2
+    DrawIcon(iconMats.clock, x - headerW - iconSize - 6, lineY + iconSize*0.6, iconSize, Color(200,200,255), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+    draw.SimpleText(areaName .. " " .. time, "cmb.socio", x - headerW, lineY, Color(200, 200, 255), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+    draw.SimpleText(activeCodeName, "cmb.socio", x - headerW, lineY + draw.GetFontHeight("cmb.socio"), Color(200, 255, 200), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+end
+
+-- Compass strip (with icon marker)
+function CMBHUD.DrawCompass(scrW, scrH, client)
+    local yaw = client:EyeAngles().yaw % 360
+    headingLerp = AngleLerp(FrameTime() * 8, headingLerp, yaw)
+
+    local centerX = scrW / 2
+    local centerY = ScreenScaleH(16)
+    local pxPerDeg = ScreenScale(2)
+    local fadeRange = scrW / 5
+
+    for i = -180, 180, 1 do
+        local angle = math.floor((headingLerp + i) % 360)
+        local offset = i * pxPerDeg
+        local alpha = 255 * (1 - math.min(math.abs(offset) / fadeRange, 1))
+        if alpha <= 5 then continue end
+        if angle % 5 ~= 0 then continue end
+
+        local label = directionLabels[angle]
+        local text = label and label or tostring(angle)
+        local font = label and "cmb.compass.direction" or "cmb.compass.degrees"
+
+        surface.SetTextColor(255, 255, 255, alpha)
+        surface.SetFont(font)
+        local w = surface.GetTextSize(text)
+        surface.SetTextPos(centerX + offset - w / 2, centerY)
+        surface.DrawText(text)
+    end
+
+    -- marker icon instead of "v"
+    local iconSize = ScreenScaleH(12)
+    DrawIcon(iconMats.compass, centerX, centerY - iconSize*0.4, iconSize, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM)
+end
+
+-- Squad list (with group icon in header)
+local squad = {
+    "GAMMA-1 (*)","RANGER-1 (N)","ECHO-1 (RC)","ECHO-2","ECHO-3","ECHO-4","ECHO-5","ECHO-6","ECHO-7","SWEEPER-5"
+}
+function CMBHUD.DrawSquadInfo(scrW, scrH, client)
+    local x, y = ScreenScale(16), scrH - ScreenScaleH(16)
+    y = y - draw.GetFontHeight("cmb.squad.header")
+    for _=1, #squad do y = y - draw.GetFontHeight("cmb.squad") end
+
+    local header = ":: SUNDOWN & ::"
+    DrawIcon(iconMats.squad, x, y + ScreenScaleH(7), ScreenScaleH(12), Color(100,255,100), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+    draw.SimpleText(header, "cmb.squad.header", x + ScreenScaleH(14), y, Color(100,255,100), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+    y = y + draw.GetFontHeight("cmb.squad.header")
+
+    for i, member in ipairs(squad) do
+        local col = (i == 1) and Color(255,255,100) or Color(200,255,200)
+        draw.SimpleText("• " .. member, "cmb.squad", x, y, col, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+        y = y + draw.GetFontHeight("cmb.squad")
+    end
+end
+
+-- Ammo counter (with bullet icon)
+function CMBHUD.DrawAmmoCounter(scrW, scrH, client)
+    local x, y = scrW - ScreenScale(16), scrH - ScreenScaleH(16)
+    local weapon = client:GetActiveWeapon()
+    if not IsValid(weapon) then return end
+
+    local clip = weapon:Clip1()
+    local ammoType = weapon:GetPrimaryAmmoType()
+    local reserve = client:GetAmmoCount(ammoType)
+
+    surface.SetFont("cmb.ammo.reserve")
+    local space = select(1, surface.GetTextSize(tostring(reserve))) + ScreenScale(4)
+
+    -- icon to the left of numbers
+    DrawIcon(iconMats.ammo, x - space - ScreenScaleH(16), y - ScreenScaleH(2), ScreenScaleH(14), Color(255,255,255), TEXT_ALIGN_RIGHT, TEXT_ALIGN_BOTTOM)
+
+    draw.SimpleText(clip, "cmb.ammo.clip", x - space, y, Color(255,255,255), TEXT_ALIGN_RIGHT, TEXT_ALIGN_BOTTOM)
+    draw.SimpleText(reserve, "cmb.ammo.reserve", x, y, Color(150,150,150), TEXT_ALIGN_RIGHT, TEXT_ALIGN_BOTTOM)
+end
+
+---------------------------------------
+-- Draw gate
+---------------------------------------
+local function ShouldDrawCMBHUD()
+    if not SafeGetBool("cmb_hud_enabled", true) then return false end
+    local client = LocalPlayer()
+    if not IsValid(client) then return false end
+    if client:GetViewEntity() ~= client then return false end
+    local wep = client:GetActiveWeapon()
+    if IsValid(wep) and wep:GetClass() == "gmod_camera" then return false end
+    if gui.IsGameUIVisible() then return false end
+    return true
+end
+
+---------------------------------------
+-- HUDPaint (fixed branching)
+---------------------------------------
+hook.Add("HUDPaint", "CMBHUD.HUDPaint", function()
+    if not ShouldDrawCMBHUD() then return end
+    local scrW, scrH = ScrW(), ScrH()
+
+    if SafeGetBool("cmb_hud_cheap", false) then
+        CMBHUD.DrawBase(scrW, scrH, LocalPlayer())
+        hook.Run("CMBHUD_DrawOverlay")
+        return
+    end
+
+    BakeHUDToRT(scrW, scrH)
+    DrawWarpedHUD(scrW, scrH)
+end)
+
+---------------------------------------
+-- Spawnmenu toggles
+---------------------------------------
+hook.Add("PopulateToolMenu", "CMBHUD.ToolSettings", function()
+    spawnmenu.AddToolMenuOption("Options", "CMB HUD", "cmb_hud_settings", "Settings", "", "", function(panel)
+        panel:ClearControls()
+        panel:CheckBox("Enable HUD", "cmb_hud_enabled")
+        panel:CheckBox("Cheap mode (no warp)", "cmb_hud_cheap")
+        panel:CheckBox("Hide default ammo", "cmb_hud_hide_default_ammo")
+        panel:NumSlider("Stability %", "cmb_hud_stability", 0, 100, 0)
+        panel:TextEntry("Status text", "cmb_hud_code")
+        panel:Help("Icon material paths (must exist in /materials)")
+        panel:TextEntry("Stability Icon", "cmb_hud_icon_stability")
+        panel:TextEntry("Clock Icon", "cmb_hud_icon_clock")
+        panel:TextEntry("Compass Icon", "cmb_hud_icon_compass")
+        panel:TextEntry("Squad Icon", "cmb_hud_icon_squad")
+        panel:TextEntry("Ammo Icon", "cmb_hud_icon_ammo")
+    end)
+end)
