@@ -1,3 +1,9 @@
+local MODULE = MODULE
+
+MODULE.Name = "Curvy Demo"
+MODULE.Description = "A demonstration of a curvy HUD style."
+MODULE.Author = "Riggs"
+
 local CurvyHUDDemo = {}
 
 local squadMembers = {
