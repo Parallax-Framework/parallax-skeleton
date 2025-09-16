@@ -5,10 +5,10 @@ FACTION.color = Color(20, 50, 150)
 FACTION.image = ax.util:GetMaterial("gamepadui/hl2/chapter3")
 
 FACTION.models = {
-    "models/player/gasmask.mdl",
-    "models/player/riot.mdl",
-    "models/player/swat.mdl",
-    "models/player/urban.mdl"
+    Model("models/player/gasmask.mdl"),
+    Model("models/player/riot.mdl"),
+    Model("models/player/swat.mdl"),
+    Model("models/player/urban.mdl")
 }
 
 FACTION_POLICE = FACTION.index
