@@ -166,8 +166,8 @@ end
 -- Main HUD Function
 ---------------------------------------
 hook.Add("HUDPaintCurvy", "CurvyHUDDemo.Draw", function(width, height, client)
-    CurvyHUDDemo:DrawGeneralInfo(width, height, client)
-    CurvyHUDDemo:DrawCompass(width, height, client)
-    CurvyHUDDemo:DrawSquadInfo(width, height, client)
-    CurvyHUDDemo:DrawAmmoCounter(width, height, client)
+    --CurvyHUDDemo:DrawGeneralInfo(width, height, client)
+    --CurvyHUDDemo:DrawCompass(width, height, client)
+    --CurvyHUDDemo:DrawSquadInfo(width, height, client)
+    --CurvyHUDDemo:DrawAmmoCounter(width, height, client)
 end)
