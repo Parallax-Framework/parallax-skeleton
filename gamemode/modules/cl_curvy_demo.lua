@@ -4,6 +4,8 @@ MODULE.Name = "Curvy Demo"
 MODULE.Description = "A demonstration of a curvy HUD style."
 MODULE.Author = "Riggs"
 
+local demoCurvyHUD = CreateClientConVar("ax_demo_curvy_hud", "1", true, false, "Enable the Curvy HUD demo.")
+
 local CurvyHUDDemo = {}
 
 local squadMembers = {
@@ -166,8 +168,10 @@ end
 -- Main HUD Function
 ---------------------------------------
 hook.Add("HUDPaintCurvy", "CurvyHUDDemo.Draw", function(width, height, client)
-    --CurvyHUDDemo:DrawGeneralInfo(width, height, client)
-    --CurvyHUDDemo:DrawCompass(width, height, client)
-    --CurvyHUDDemo:DrawSquadInfo(width, height, client)
-    --CurvyHUDDemo:DrawAmmoCounter(width, height, client)
+    if ( !demoCurvyHUD:GetBool() ) then return end
+
+    CurvyHUDDemo:DrawGeneralInfo(width, height, client)
+    CurvyHUDDemo:DrawCompass(width, height, client)
+    CurvyHUDDemo:DrawSquadInfo(width, height, client)
+    CurvyHUDDemo:DrawAmmoCounter(width, height, client)
 end)
