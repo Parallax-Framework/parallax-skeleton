@@ -3,8 +3,6 @@ FACTION.description = "An ordinary citizen living life while wearing ridiculous 
 FACTION.color = Color(20, 150, 20)
 FACTION.isDefault = true
 
-FACTION.image = ax.util:GetMaterial("gamepadui/hl2/chapter1")
-
 FACTION.models = {
     Model("models/humans/group01/female_01.mdl"),
     Model("models/humans/group01/female_02.mdl"),
