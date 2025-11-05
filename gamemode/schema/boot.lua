@@ -1,3 +1,3 @@
-SCHEMA.Name = "Skeleton"
-SCHEMA.Description = "A prototype schema for the Parallax framework."
-SCHEMA.Author = "Riggs"
+SCHEMA.name = "Skeleton"
+SCHEMA.description = "A prototype schema for the Parallax framework."
+SCHEMA.author = "Riggs"
