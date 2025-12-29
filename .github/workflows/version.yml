@@ -1,0 +1,76 @@
+name: Generate Version JSON
+
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: write
+
+jobs:
+  update-version:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Generate version JSON
+        run: |
+          VALID_COUNT=0
+          for COMMIT in $(git rev-list --reverse --since="2025-07-18" HEAD); do
+              AUTHOR=$(git show -s --format='%ae' $COMMIT)
+              PARENTS=$(git rev-list --parents -n 1 $COMMIT | wc -w)
+
+              if [[ "$AUTHOR" != "github-actions@github.com" && "$PARENTS" -lt 3 ]]; then
+                  VALID_COUNT=$((VALID_COUNT + 1))
+              fi
+          done
+
+          # Versioning format:
+          # < 100       => 0.0.X
+          # 100–999     => 0.X.Y
+          # 1000+       => X.Y.Z
+          if (( VALID_COUNT < 100 )); then
+              MAJOR=0
+              MINOR=0
+              PATCH=$VALID_COUNT
+          elif (( VALID_COUNT < 1000 )); then
+              MAJOR=0
+              MINOR=$((VALID_COUNT / 100))
+              PATCH=$((VALID_COUNT % 100))
+          else
+              MAJOR=$((VALID_COUNT / 1000))
+              MINOR=$(((VALID_COUNT % 1000) / 100))
+              PATCH=$((VALID_COUNT % 100))
+          fi
+
+          PATCH_PADDED=$(printf "%02d" $PATCH)
+          VERSION="$MAJOR.$MINOR.$PATCH_PADDED"
+
+          echo "{" > parallax-version.json
+          echo "  \"version\": \"$VERSION\"," >> parallax-version.json
+          echo "  \"commitCount\": $VALID_COUNT," >> parallax-version.json
+          echo "  \"commitHash\": \"$(git rev-parse --short HEAD)\"," >> parallax-version.json
+          echo "  \"branch\": \"main\"" >> parallax-version.json
+          echo "}" >> parallax-version.json
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+
+      - name: Commit and push version file
+        run: |
+          git add -f parallax-version.json
+
+          if git diff --cached --quiet; then
+            echo "No changes to version file. Skipping commit."
+            exit 0
+          fi
+
+          git commit -m "[skip ci] [ci version bump] Update parallax-version.json"
+          git push
