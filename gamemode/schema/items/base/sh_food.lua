@@ -22,7 +22,7 @@ ITEM.weight = 0.1
 ITEM:AddAction("consume", {
     name = "Consume",
     icon = "parallax/icons/check-circle.png",
-    OnRun = function(action, item, client)
+    OnRun = function(action, client, item)
         if ( !ax.util:IsValidPlayer(client) ) then return false end
 
         local health = math.max(tonumber(item.health) or 0, 0)

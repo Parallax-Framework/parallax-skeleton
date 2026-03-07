@@ -20,7 +20,7 @@ ITEM.weight = 0.1
 ITEM:AddAction("apply", {
     name = "Apply",
     icon = "parallax/icons/check-circle.png",
-    OnRun = function(action, item, client)
+    OnRun = function(action, client, item)
         if ( !ax.util:IsValidPlayer(client) ) then return false end
 
         local nextHealth = math.min(client:Health() + 12, client:GetMaxHealth())
